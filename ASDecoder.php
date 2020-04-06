@@ -15,15 +15,17 @@ use Exception;
  * @author   Griffin Ledingham <gcledingham@gmail.com>
  * @license  http://opensource.org/licenses/BSD-3-Clause 3-clause BSD
  * @link     https://github.com/GriffinLedingham/php-apple-signin
+ * @link     https://github.com/wubuwei/php-apple-signin
  */
-class ASDecoder {
+class ASDecoder
+{
     /**
      * Parse a provided Sign In with Apple identity token.
-     *
-     * @param string $identityToken
-     * @return object|null
+     * @param $identityToken
+     * @return ASPayload
+     * @throws Exception
      */
-    public static function getAppleSignInPayload(string $identityToken) : ?object
+    public static function getAppleSignInPayload($identityToken)
     {
         $identityPayload = self::decodeIdentityToken($identityToken);
         return new ASPayload($identityPayload);
@@ -31,18 +33,17 @@ class ASDecoder {
 
     /**
      * Decode the Apple encoded JWT using Apple's public key for the signing.
-     *
-     * @param string $identityToken
+     * @param $identityToken
      * @return object
+     * @throws Exception
      */
-    public static function decodeIdentityToken(string $identityToken) : object {
-        $publicKeyData = self::fetchPublicKey();
+    public static function decodeIdentityToken($identityToken)
+    {
+        $publicKeyData = self::fetchPublicKey($identityToken);
 
         $publicKey = $publicKeyData['publicKey'];
         $alg = $publicKeyData['alg'];
-
         $payload = JWT::decode($identityToken, $publicKey, [$alg]);
-
         return $payload;
     }
 
@@ -50,27 +51,50 @@ class ASDecoder {
      * Fetch Apple's public key from the auth/keys REST API to use to decode
      * the Sign In JWT.
      *
+     * @param $identityToken
      * @return array
+     * @throws Exception
      */
-    public static function fetchPublicKey() : array {
+    public static function fetchPublicKey($identityToken)
+    {
         $publicKeys = file_get_contents('https://appleid.apple.com/auth/keys');
         $decodedPublicKeys = json_decode($publicKeys, true);
 
-        if(!isset($decodedPublicKeys['keys']) || count($decodedPublicKeys['keys']) < 1) {
+        if (!isset($decodedPublicKeys['keys']) || count($decodedPublicKeys['keys']) < 1) {
             throw new Exception('Invalid key format.');
         }
 
-        $parsedKeyData = $decodedPublicKeys['keys'][0];
-        $parsedPublicKey= JWK::parseKey($parsedKeyData);
+        // 苹果公钥返回的 keys 内数据不是固定顺序，此处按索引取 auth keys
+        // Value by index
+        try {
+            $tks = explode('.', $identityToken);
+            if (count($tks) != 3) {
+                throw new Exception('Wrong number of segments');
+            }
+            list($headb64, $bodyb64, $cryptob64) = $tks;
+            $header = JWT::jsonDecode(JWT::urlsafeB64Decode($headb64));
+            $kid = $header->kid;
+
+            if (count($decodedPublicKeys['keys']) > 1) {
+                $indexPublicInfo = array_column($decodedPublicKeys['keys'], null, 'kid');
+                $parsedKeyData = isset($indexPublicInfo[$kid]) ? $indexPublicInfo[$kid] : $decodedPublicKeys['keys'][0];
+            } else {
+                $parsedKeyData = $decodedPublicKeys['keys'][0];
+            }
+        } catch (\Exception $exception) {
+            $parsedKeyData = $decodedPublicKeys['keys'][0];
+        }
+
+        $parsedPublicKey = JWK::parseKey($parsedKeyData);
         $publicKeyDetails = openssl_pkey_get_details($parsedPublicKey);
 
-        if(!isset($publicKeyDetails['key'])) {
+        if (!isset($publicKeyDetails['key'])) {
             throw new Exception('Invalid public key details.');
         }
 
         return [
             'publicKey' => $publicKeyDetails['key'],
-            'alg' => $parsedKeyData['alg']
+            'alg'       => $parsedKeyData['alg']
         ];
     }
 }
@@ -79,37 +103,46 @@ class ASDecoder {
  * A class decorator for the Sign In with Apple payload produced by
  * decoding the signed JWT from a client.
  */
-class ASPayload {
+class ASPayload
+{
     protected $_instance;
 
-    public function __construct(?object $instance) {
-        if(is_null($instance)) {
+    public function __construct($instance)
+    {
+        if (is_null($instance)) {
             throw new Exception('ASPayload received null instance.');
         }
         $this->_instance = $instance;
     }
 
-    public function __call($method, $args) {
+    public function __call($method, $args)
+    {
         return call_user_func_array(array($this->_instance, $method), $args);
     }
 
-    public function __get($key) {
+    public function __get($key)
+    {
         return $this->_instance->$key;
     }
 
-    public function __set($key, $val) {
+    public function __set($key, $val)
+    {
         return $this->_instance->$key = $val;
     }
 
-    public function getEmail() : ?string {
+    public function getEmail()
+    {
         return (isset($this->_instance->email)) ? $this->_instance->email : null;
     }
 
-    public function getUser() : ?string {
+    public function getUser()
+    {
         return (isset($this->_instance->sub)) ? $this->_instance->sub : null;
     }
 
-    public function verifyUser(string $user) : bool {
+    public function verifyUser($user)
+    {
         return $user === $this->getUser();
     }
+
 }
