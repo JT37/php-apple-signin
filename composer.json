@@ -1,13 +1,13 @@
 {
-    "name": "griffinledingham/php-apple-signin",
+    "name": "wubuwei/php-apple-signin",
     "type": "library",
     "description": "A simple library to decode and parse Apple Sign In client tokens.",
     "keywords": ["apple","sign","in","ios","php","jwt","jwk"],
     "license": "MIT",
     "authors": [
         {
-            "name": "Griffin Ledingham",
-            "email": "gcledingham@gmail.com",
+            "name": "wubuwei",
+            "email": "wubuwei.dev@gmail.com",
             "role": "Developer"
         }
     ],
