@@ -2,6 +2,8 @@ php-apple-signin
 =======
 PHP library to manage Sign In with Apple identifier tokens, and validate them server side passed through by the iOS client.
 
+PHP 扩展包验证苹果授权登录后的参数 identifier tokens，确保 token 是真实的 Apple Id 授权的。
+
 Installation
 ------------
 
