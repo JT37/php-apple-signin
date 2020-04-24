@@ -64,8 +64,8 @@ class ASDecoder
             throw new Exception('Invalid key format.');
         }
 
-        // 苹果公钥返回的 keys 内数据不是固定顺序，此处按索引取 auth keys
-        // Value by index
+        // 苹果公钥返回的 keys 内数据不是固定顺序，此处按索引取 auth keys，取正确的 key
+        // value by index
         try {
             $tks = explode('.', $identityToken);
             if (count($tks) != 3) {
